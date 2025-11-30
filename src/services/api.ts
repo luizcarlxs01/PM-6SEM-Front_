@@ -6,17 +6,10 @@
 
 import axios, { AxiosError } from "axios";
 
-const baseURL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://localhost:7215"; // fallback local
-
 const api = axios.create({
-  baseURL, // ex: https://localhost:7215  ou  https://xxxx-xxx.ngrok-free.app
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // baseURL apontando diretamente para a API (sem /swagger)
+  baseURL: "https://localhost:7215/api",
 });
-
 
 // Interceptor de requisição: adiciona Authorization: Bearer <token>
 api.interceptors.request.use((config) => {

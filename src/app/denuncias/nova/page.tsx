@@ -6,6 +6,7 @@
  * - Se o usuário estiver logado, enviamos IdUsuario.
  * - Se não estiver logado, a denúncia será anônima (IdUsuario = null).
  * - Suporta upload de imagem, enviada como base64 para a API.
+ * - Integração com ViaCEP: CEP auto-preenche endereço.
  */
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
@@ -23,13 +24,25 @@ interface ResponseModel<T> {
   status: boolean;
 }
 
+// mesma ideia de "Denuncia" usada em outras telas
+interface Denuncia {
+  idDenuncia: number;
+  logradouro: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  status: string;
+  dataDenuncia: string;
+}
+
 export default function NovaDenunciaPage() {
   const router = useRouter();
 
   const [logradouro, setLogradouro] = useState("");
   const [numero, setNumero] = useState("");
   const [complemento, setComplemento] = useState("");
-  const [cep, setCep] = useState(""); // guarda só dígitos
+  const [cep, setCep] = useState(""); // guarda somente dígitos
   const [bairro, setBairro] = useState("");
   const [cidade, setCidade] = useState("");
   const [estado, setEstado] = useState("");
@@ -51,10 +64,12 @@ export default function NovaDenunciaPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
-  // Estados para controle do CEP / ViaCEP
+  // CEP / ViaCEP
   const [buscandoCep, setBuscandoCep] = useState(false);
-  const [cepMensagem, setCepMensagem] = useState<string | null>(null);
   const [cepValido, setCepValido] = useState(false);
+
+  // ID da denúncia gerada (para anônimos)
+  const [idDenunciaGerada, setIdDenunciaGerada] = useState<number | null>(null);
 
   // CEP formatado para exibição (00000-000)
   const cepFormatado =
@@ -73,10 +88,7 @@ export default function NovaDenunciaPage() {
         if (response.data.status && response.data.dados) {
           setProblemas(response.data.dados);
         } else {
-          console.error(
-            "Falha ao carregar problemas:",
-            response.data.mensagem
-          );
+          console.error("Falha ao carregar problemas:", response.data.mensagem);
         }
       } catch (error) {
         console.error("Erro ao carregar problemas:", error);
@@ -109,77 +121,73 @@ export default function NovaDenunciaPage() {
     reader.readAsDataURL(file);
   };
 
-  // Máscara de CEP: só números, max 8 dígitos, exibe como 00000-000
+  // Máscara de CEP: só números, max 8 dígitos
   const handleCepChange = (event: ChangeEvent<HTMLInputElement>) => {
     let valor = event.target.value;
 
-    valor = valor.replace(/\D/g, ""); // só números
-    valor = valor.slice(0, 8); // máximo 8 dígitos
+    // remove tudo que não for número
+    valor = valor.replace(/\D/g, "");
+    // limita a 8 dígitos
+    valor = valor.slice(0, 8);
 
     setCep(valor);
     setCepValido(false);
-    setCepMensagem(null);
-    // limpa endereço anterior se usuário trocar CEP
+    // se o usuário começa a alterar o CEP, limpamos endereço antigo
     setLogradouro("");
     setBairro("");
     setCidade("");
     setEstado("");
   };
 
-  // Buscar CEP na API pública ViaCEP
-  const buscarCep = async () => {
-    setCepMensagem(null);
-    setCepValido(false);
+  // Busca CEP automaticamente quando possuir 8 dígitos
+  useEffect(() => {
+    const buscarCep = async () => {
+      if (cep.length !== 8) return;
 
-    if (cep.length !== 8) {
-      setCepMensagem("Informe um CEP válido com 8 dígitos.");
-      return;
-    }
+      try {
+        setBuscandoCep(true);
+        setErro(null);
 
-    try {
-      setBuscandoCep(true);
+        const resposta = await fetch(
+          `https://viacep.com.br/ws/${cep}/json/`
+        );
 
-      const response = await fetch(
-        `https://viacep.com.br/ws/${cep}/json/`
-      );
+        if (!resposta.ok) {
+          throw new Error("Erro ao consultar CEP");
+        }
 
-      if (!response.ok) {
-        throw new Error("Erro ao consultar CEP.");
-      }
+        const dados = await resposta.json();
 
-      const data = await response.json();
+        if (dados.erro) {
+          setCepValido(false);
+          setErro("CEP não encontrado. Verifique o número digitado.");
+          return;
+        }
 
-      if (data.erro) {
-        setCepMensagem("CEP não encontrado. Verifique e tente novamente.");
-        setLogradouro("");
-        setBairro("");
-        setCidade("");
-        setEstado("");
+        setLogradouro(dados.logradouro || "");
+        setBairro(dados.bairro || "");
+        setCidade(dados.localidade || "");
+        setEstado((dados.uf || "").toUpperCase());
+        setCepValido(true);
+      } catch (e) {
+        console.error("Erro ao buscar CEP:", e);
         setCepValido(false);
-        return;
+        setErro(
+          "Não foi possível buscar o CEP no momento. Tente novamente ou preencha o endereço manualmente."
+        );
+      } finally {
+        setBuscandoCep(false);
       }
+    };
 
-      // Preenche campos com o retorno do ViaCEP
-      setLogradouro(data.logradouro || "");
-      setBairro(data.bairro || "");
-      setCidade(data.localidade || "");
-      setEstado((data.uf || "").toUpperCase());
-
-      setCepValido(true);
-      setCepMensagem("Endereço preenchido automaticamente pelo CEP.");
-    } catch (error) {
-      console.error("Erro ao buscar CEP:", error);
-      setCepMensagem("Erro ao buscar CEP. Tente novamente.");
-      setCepValido(false);
-    } finally {
-      setBuscandoCep(false);
-    }
-  };
+    buscarCep();
+  }, [cep]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setErro(null);
     setMensagem(null);
+    setIdDenunciaGerada(null);
 
     if (
       !logradouro.trim() ||
@@ -234,31 +242,45 @@ export default function NovaDenunciaPage() {
         arquivoFotoBase64: arquivoBase64, // pode ser null
       };
 
-      const response = await api.post<ResponseModel<any>>(
+      const response = await api.post<ResponseModel<Denuncia[]>>(
         "/Denuncias/CriarDenuncia",
         payload
       );
 
-      if (!response.data.status) {
+      const lista = response.data.dados;
+
+      if (!response.data.status || !lista || lista.length === 0) {
         setErro(
-          response.data.mensagem || "Não foi possível registrar a denúncia."
+          response.data.mensagem ||
+            "Não foi possível registrar a denúncia corretamente."
         );
         return;
       }
 
-      setMensagem(
-        "Denúncia registrada com sucesso! Obrigado pela contribuição."
+      // Como a API devolve uma lista de denúncias,
+      // vamos pegar o MAIOR IdDenuncia, assumindo que é a recém-criada.
+      const novoId = lista.reduce(
+        (max, d) => (d.idDenuncia > max ? d.idDenuncia : max),
+        lista[0].idDenuncia
       );
-      setErro(null);
 
-      // Redireciona gentilmente após alguns segundos
-      setTimeout(() => {
-        if (idUsuario) {
+      if (idUsuario) {
+        // Usuário logado: mantém comportamento de redirecionar,
+        // mas já informa o ID da denúncia que acabou de ser criada.
+        setMensagem(
+          `Denúncia registrada com sucesso! ID da denúncia: ${novoId}. Redirecionando para suas denúncias...`
+        );
+
+        setTimeout(() => {
           router.push("/denuncias/minhas");
-        } else {
-          router.push("/");
-        }
-      }, 1200);
+        }, 1500);
+      } else {
+        // Denúncia anônima: mostra o ID na tela para o usuário anotar
+        setIdDenunciaGerada(novoId);
+        setMensagem(
+          "Denúncia registrada com sucesso! Guarde o ID abaixo para consultar o status depois."
+        );
+      }
     } catch (error: any) {
       console.error("Erro ao registrar denúncia:", error);
       if (error.response?.data?.mensagem) {
@@ -272,7 +294,7 @@ export default function NovaDenunciaPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex justify-center px-4 py-8 bg.black text-white">
+    <div className="min-h-[calc(100vh-64px)] flex justify-center px-4 py-8 bg-black text-white">
       <div className="w-full max-w-3xl space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl font-bold">Registrar nova denúncia</h1>
@@ -297,7 +319,7 @@ export default function NovaDenunciaPage() {
                 onChange={(e) => setLogradouro(e.target.value)}
                 className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
                 placeholder="Ex: Avenida Paulista"
-                disabled={!cepValido}
+                disabled={!cepValido || buscandoCep}
               />
             </div>
             <div>
@@ -325,29 +347,24 @@ export default function NovaDenunciaPage() {
               />
             </div>
             <div className="md:col-span-1">
-              <label className="block text-xs mb-1">CEP *</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={cepFormatado}
-                  onChange={handleCepChange}
-                  className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm flex-1"
-                  placeholder="00000-000"
-                  inputMode="numeric"
-                  maxLength={9} // 8 dígitos + hífen
-                />
-                <button
-                  type="button"
-                  onClick={buscarCep}
-                  disabled={cep.length !== 8 || buscandoCep}
-                  className="px-3 py-2 rounded bg-green-600 text-black text-xs font-semibold hover:bg-green-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {buscandoCep ? "Buscando..." : "Buscar"}
-                </button>
-              </div>
-              {cepMensagem && (
-                <p className="text-[11px] text-gray-300 mt-1">
-                  {cepMensagem}
+              <label className="block text-xs mb-1">
+                CEP *{" "}
+                <span className="text-[10px] text-gray-400">
+                  (ao digitar 8 números, buscamos automaticamente)
+                </span>
+              </label>
+              <input
+                type="text"
+                value={cepFormatado}
+                onChange={handleCepChange}
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
+                placeholder="00000-000"
+                inputMode="numeric"
+                maxLength={9} // 8 dígitos + hífen
+              />
+              {buscandoCep && (
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Buscando CEP na base do ViaCEP...
                 </p>
               )}
             </div>
@@ -357,8 +374,8 @@ export default function NovaDenunciaPage() {
                 type="text"
                 value={bairro}
                 onChange={(e) => setBairro(e.target.value)}
-                className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm"
-                disabled={!cepValido}
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
+                disabled={!cepValido || buscandoCep}
               />
             </div>
           </div>
@@ -370,8 +387,8 @@ export default function NovaDenunciaPage() {
                 type="text"
                 value={cidade}
                 onChange={(e) => setCidade(e.target.value)}
-                className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm"
-                disabled={!cepValido}
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
+                disabled={!cepValido || buscandoCep}
               />
             </div>
             <div>
@@ -380,10 +397,10 @@ export default function NovaDenunciaPage() {
                 type="text"
                 value={estado}
                 onChange={(e) => setEstado(e.target.value.toUpperCase())}
-                className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm"
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
                 maxLength={2}
                 placeholder="SP, RJ, MG..."
-                disabled={!cepValido}
+                disabled={!cepValido || buscandoCep}
               />
             </div>
           </div>
@@ -394,7 +411,7 @@ export default function NovaDenunciaPage() {
               type="text"
               value={pontoReferencia}
               onChange={(e) => setPontoReferencia(e.target.value)}
-              className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm"
+              className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
               placeholder="Ex: perto da estação X"
             />
           </div>
@@ -410,7 +427,7 @@ export default function NovaDenunciaPage() {
                     e.target.value ? Number(e.target.value) : null
                   )
                 }
-                className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm"
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm"
                 disabled={carregandoProblemas}
               >
                 <option value="">
@@ -450,7 +467,7 @@ export default function NovaDenunciaPage() {
             <textarea
               value={motivosPedido}
               onChange={(e) => setMotivosPedido(e.target.value)}
-              className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm min-h-[60px]"
+              className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm min-h-[60px]"
               placeholder="Explique por que esse problema prejudica a acessibilidade no local."
             />
           </div>
@@ -460,7 +477,7 @@ export default function NovaDenunciaPage() {
             <textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              className="w-full p-2 rounded bg-gray-800 text.white border border-gray-700 text-sm min-h-[80px]"
+              className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 text-sm min-h-[80px]"
               placeholder="Inclua detalhes adicionais que possam ajudar na análise."
             />
           </div>
@@ -485,9 +502,7 @@ export default function NovaDenunciaPage() {
 
             {arquivoPreview && (
               <div className="mt-2">
-                <p className="text-xs text-gray-400 mb-1">
-                  Pré-visualização:
-                </p>
+                <p className="text-xs text-gray-400 mb-1">Pré-visualização:</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={arquivoPreview}
@@ -502,6 +517,26 @@ export default function NovaDenunciaPage() {
           {erro && <p className="text-sm text-red-400">{erro}</p>}
           {mensagem && <p className="text-sm text-green-400">{mensagem}</p>}
 
+          {idDenunciaGerada && (
+            <div className="mt-2 border border-green-500/40 bg-green-900/20 rounded-lg p-3 text-sm text-green-100 space-y-2">
+              <p>
+                <span className="font-semibold">ID da denúncia: </span>
+                <span className="font-mono text-lg">{idDenunciaGerada}</span>
+              </p>
+              <p className="text-xs text-gray-200">
+                Guarde este ID para consultar o andamento da sua denúncia na
+                tela <span className="italic">“Buscar denúncia por ID”</span>.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/denuncias/buscar")}
+                className="mt-1 inline-flex px-3 py-1.5 rounded-full bg-green-600 text-black text-xs font-semibold hover:bg-green-500 transition"
+              >
+                Ir para página de consulta
+              </button>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -513,15 +548,17 @@ export default function NovaDenunciaPage() {
             <button
               type="submit"
               disabled={enviando}
-              className="px-4 py-2 rounded-full bg-green-600 text.black text-sm font-semibold hover:bg-green-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-full bg-green-600 text-black text-sm font-semibold hover:bg-green-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {enviando ? "Enviando..." : "Registrar denúncia"}
             </button>
           </div>
+
           <p className="mt-3 text-[11px] text-gray-400">
-            Ao registrar uma denúncia, você concorda com o uso das informações e imagens
-            fornecidas para fins cívicos e estatísticos na plataforma{" "}
-            <span className="text-green-400">Calçada Cidadã</span>, conforme descrito nos{" "}
+            Ao registrar uma denúncia, você concorda com o uso das informações e
+            imagens fornecidas para fins cívicos e estatísticos na plataforma{" "}
+            <span className="text-green-400">Calçada Cidadã</span>, conforme
+            descrito nos{" "}
             <a
               href="/termos"
               className="text-green-400 underline hover:text-green-300"
