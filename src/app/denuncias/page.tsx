@@ -15,7 +15,7 @@ type Denuncia = {
   dataDenuncia: string;
 };
 
-const API_BASE_URL = "https://localhost:7215"; // ✅ sua API está nessa porta
+const API_BASE_URL = "https://pm-6sem-2025-d6gdgjhjg7b3f5dm.brazilsouth-01.azurewebsites.net/"; // API está nessa porta
 
 export default function DenunciasPage() {
   const [denuncias, setDenuncias] = useState<Denuncia[]>([]);
@@ -76,7 +76,7 @@ export default function DenunciasPage() {
           status: editStatus,
         },
         {
-          headers: getAuthHeaders(), // 🔐 envia Bearer token
+          headers: getAuthHeaders(), // envia Bearer token
         }
       );
 
