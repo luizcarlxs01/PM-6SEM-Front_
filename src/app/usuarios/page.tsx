@@ -58,7 +58,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-8 rounded-xl px-4 py-2 bg-black">
       <h1 className="text-2xl font-bold mb-4">Lista de Usuários</h1>
 
       {usuarios.length === 0 ? (

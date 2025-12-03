@@ -61,7 +61,7 @@ export default function MePage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="p-8 rounded-xl px-7 py-7 bg-black">
       <h1 className="text-2xl font-bold mb-4">Meus dados</h1>
 
       <Card>

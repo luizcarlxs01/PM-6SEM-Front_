@@ -294,7 +294,7 @@ export default function NovaDenunciaPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex justify-center px-4 py-8 bg-black text-white">
+    <div className="min-h-[calc(100vh-64px)] flex justify-center px-4 py-8 bg-black text-white rounded-xl">
       <div className="w-full max-w-3xl space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl font-bold">Registrar nova denúncia</h1>

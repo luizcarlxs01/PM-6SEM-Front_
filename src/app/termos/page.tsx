@@ -8,7 +8,7 @@
 export default function TermosPage() {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-black rounded-xl text-white px-4 py-8 flex justify-center">
-      <div className="w-full max-w-4xl space-y-6 text-sm md:text-base">
+      <div className="w-full max-w-4xl space-y-6 text-sm md:text-base rounded-xl px-4 py-2 bg-black">
         <header className="space-y-1">
           <h1 className="text-2xl font-bold">Termos e Condições de Uso - Calçada Cidadã</h1>
           <p className="text-xs text-gray-400">Data da Última Atualização: 18/11/2025</p>

@@ -34,7 +34,7 @@ export default function HomePage() {
 
   return (
     <main className="rounded-xl min-h-[calc(100vh-64px)] text-white px-4 py-8 flex justify-center">
-      <div className="w-full max-w-6xl space-y-8">
+      <div className="w-full rounded-xl px-4 py-2 bg-black max-w-6xl space-y-8">
         {/* Hero */}
         <section className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-4">

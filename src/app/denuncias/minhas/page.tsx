@@ -75,7 +75,7 @@ export default function MinhasDenunciasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-8 rounded-xl">
       <h1 className="text-2xl font-bold mb-4">Minhas denúncias</h1>
 
       {denuncias.length === 0 ? (
