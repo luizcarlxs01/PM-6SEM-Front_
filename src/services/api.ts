@@ -4,7 +4,7 @@ import axios, { AxiosError } from "axios";
 const api = axios.create({
   baseURL:
     process.env.NEXT_PUBLIC_API_URL ||
-    "https://pm-6sem-2025-d6gdgjhjg7b3f5dm.brazilsouth-01.azurewebsites.net/api",
+    "https://pm-6sem-2025-d6gdgjhjg7b3f5dm.brazilsouth-01.azurewebsites.net/swagger/index.html",
 });
 // Interceptor de requisição: adiciona Authorization: Bearer <token>
 api.interceptors.request.use((config) => {
